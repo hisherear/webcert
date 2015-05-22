@@ -1,6 +1,7 @@
 package se.inera.webcert.notifications.route;
 
 import static org.apache.camel.component.mock.MockEndpoint.assertIsSatisfied;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 
@@ -144,12 +145,17 @@ public class RouteTest {
             }
         });
 
-        mockCertificateStatusUpdateEndpoint.expectedMessageCount(4);
+        mockCertificateStatusUpdateEndpoint.expectedMessageCount(1);
         mockErrorHandlerEndpoint.expectedMessageCount(0);
-        mockRedeliveryEndpoint.expectedMessageCount(1);
+        mockRedeliveryEndpoint.expectedMessageCount(0);
 
         // When
-        processNotificationRequestEndpoint.sendBody(NOTIFICATION_MESSAGE);
+        try {
+            processNotificationRequestEndpoint.sendBody(NOTIFICATION_MESSAGE);
+            fail();
+        } catch (CamelExecutionException e) {
+            // expected
+        }
 
         // Then
         assertIsSatisfied(mockCertificateStatusUpdateEndpoint);
@@ -158,7 +164,7 @@ public class RouteTest {
     }
 
     @Test
-    public void testTechnicalException() throws InterruptedException {
+    public void testNonRecoverableException() throws InterruptedException {
         // Given
         mockCertificateStatusUpdateEndpoint.whenAnyExchangeReceived(new Processor() {
             @Override
@@ -194,12 +200,17 @@ public class RouteTest {
             }
         });
 
-        mockCertificateStatusUpdateEndpoint.expectedMessageCount(4);
+        mockCertificateStatusUpdateEndpoint.expectedMessageCount(1);
         mockErrorHandlerEndpoint.expectedMessageCount(0);
-        mockRedeliveryEndpoint.expectedMessageCount(1);
+        mockRedeliveryEndpoint.expectedMessageCount(0);
 
         // When
-        processNotificationRequestEndpoint.sendBody(NOTIFICATION_MESSAGE);
+        try {
+            processNotificationRequestEndpoint.sendBody(NOTIFICATION_MESSAGE);
+            fail();
+        } catch (CamelExecutionException e) {
+            // expected
+        }
 
         // Then
         assertIsSatisfied(mockCertificateStatusUpdateEndpoint);

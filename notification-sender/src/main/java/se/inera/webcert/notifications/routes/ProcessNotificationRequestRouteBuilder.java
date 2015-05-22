@@ -29,9 +29,6 @@ public class ProcessNotificationRequestRouteBuilder extends RouteBuilder {
                 .to("sendNotificationWSEndpoint");
 
         from("sendNotificationWSEndpoint").routeId("sendNotificationToWS")
-                .errorHandler(deadLetterChannel("direct:redeliveryExhaustedEndpoint")
-                        .maximumRedeliveries(maxRedeliveries).redeliveryDelay(redeliveryDelay)
-                        .useExponentialBackOff())
                 .onException(NonRecoverableCertificateStatusUpdateServiceException.class).handled(true).to("direct:errorHandlerEndpoint").end()
                 .transacted()
                 .unmarshal("jaxbMessageDataFormat")
@@ -39,12 +36,6 @@ public class ProcessNotificationRequestRouteBuilder extends RouteBuilder {
 
         from("direct:errorHandlerEndpoint").routeId("errorLogging")
                 .log(LoggingLevel.ERROR, LOG, simple("Un-recoverable exception for intygs-id: ${in.headers.intygsId}, with message: ${exception.message}\n ${exception.stacktrace}").getText())
-                .stop();
-
-        from("direct:redeliveryExhaustedEndpoint").routeId("redeliveryErrorLogging")
-                .log(LoggingLevel.ERROR, LOG, simple("Redelivery attempts exhausted for intygs-id: ${in.headers.intygsId}, with message: ${exception.message}\n ${exception.stacktrace}").getText())
-                .marshal("jaxbMessageDataFormat")
-                .to("deadLetterEndpoint")
                 .stop();
     }
 
