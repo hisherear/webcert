@@ -4,18 +4,11 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 
 import se.inera.webcert.notifications.service.exception.NonRecoverableCertificateStatusUpdateServiceException;
 
 public class ProcessNotificationRequestRouteBuilder extends RouteBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(ProcessNotificationRequestRouteBuilder.class);
-
-    @Value("${errorhanding.maxRedeliveries}")
-    private int maxRedeliveries = 3;
-
-    @Value("${errorhanding.redeliveryDelay}")
-    private long redeliveryDelay = 10;
 
     @Override
     public void configure() throws Exception {
@@ -29,6 +22,7 @@ public class ProcessNotificationRequestRouteBuilder extends RouteBuilder {
                 .to("sendNotificationWSEndpoint");
 
         from("sendNotificationWSEndpoint").routeId("sendNotificationToWS")
+                .errorHandler(loggingErrorHandler("se.inera.webcert.notifications.resend").level(LoggingLevel.WARN))
                 .onException(NonRecoverableCertificateStatusUpdateServiceException.class).handled(true).to("direct:errorHandlerEndpoint").end()
                 .transacted()
                 .unmarshal("jaxbMessageDataFormat")
