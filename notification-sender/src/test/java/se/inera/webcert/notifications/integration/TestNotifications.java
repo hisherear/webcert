@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.Queue;
-import javax.jms.Session;
+import javax.jms.*;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.test.spring.CamelSpringJUnit4ClassRunner;
@@ -45,6 +42,8 @@ public class TestNotifications {
     private static final int SECONDS_TO_WAIT = 10;
 
     private static final String INTYG_JSON = "{\"id\":\"1234\",\"typ\":\"fk7263\"}";
+    private static final String GROUP_ID_1 = "group1";
+    private static final String GROUP_ID_2 = "group2";
 
     @Autowired
     private JmsTemplate jmsTemplate;
@@ -71,9 +70,9 @@ public class TestNotifications {
         NotificationMessage notificationMessage2 = createNotificationMessage("intyg2", HandelseType.INTYGSUTKAST_ANDRAT);
         NotificationMessage notificationMessage3 = createNotificationMessage("intyg3", HandelseType.INTYGSUTKAST_SIGNERAT);
 
-        sendMessage(notificationMessage1);
-        sendMessage(notificationMessage2);
-        sendMessage(notificationMessage3);
+        sendMessage(notificationMessage1, GROUP_ID_1);
+        sendMessage(notificationMessage2, GROUP_ID_1);
+        sendMessage(notificationMessage3, GROUP_ID_1);
 
         await().atMost(SECONDS_TO_WAIT, TimeUnit.SECONDS).until(new Callable<Boolean>() {
             @Override
@@ -90,22 +89,26 @@ public class TestNotifications {
         final String intygsId1 = FALLERAT_MEDDELANDE + "-2";
         final String intygsId2 = "korrekt-meddelande-1";
         NotificationMessage notificationMessage1 = createNotificationMessage(intygsId1, HandelseType.INTYGSUTKAST_SKAPAT);
-        NotificationMessage notificationMessage2 = createNotificationMessage(intygsId1, HandelseType.INTYGSUTKAST_ANDRAT);
+        NotificationMessage notificationMessage2 = createNotificationMessage(intygsId2, HandelseType.INTYGSUTKAST_ANDRAT);
 
-        sendMessage(notificationMessage1);
+        sendMessage(notificationMessage1, GROUP_ID_1);
         LOG.info("Message 1 sent");
-        sendMessage(notificationMessage2);
+        sendMessage(notificationMessage2, GROUP_ID_2);
         LOG.info("Message 2 sent");
 
         await().atMost(SECONDS_TO_WAIT, TimeUnit.SECONDS).until(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
                 int numberOfSuccessfulMessages = certificateStatusUpdateForCareResponderStub.getNumberOfSentMessages();
+                LOG.debug("Number of sucessful messages: {}", numberOfSuccessfulMessages);
                 if (numberOfSuccessfulMessages == 2) {
                     List<String> utlatandeIds = certificateStatusUpdateForCareResponderStub.getIntygsIdsInOrder();
+                    LOG.debug("Number of utlatandeIds: {}", utlatandeIds.size());
+                    LOG.debug("First ID: {}", utlatandeIds.get(0));
+                    LOG.debug("Second ID: {}", utlatandeIds.get(1));
                     return (utlatandeIds.size() == 2 &&
-                            utlatandeIds.get(0) == intygsId2 &&
-                            utlatandeIds.get(1) == intygsId1);
+                            utlatandeIds.get(0).equals(intygsId2) &&
+                            utlatandeIds.get(1).equals(intygsId1));
                 }
                 return false;
             }
@@ -121,11 +124,13 @@ public class TestNotifications {
         return objectMapper.writeValueAsString(notificationMessage);
     }
 
-    private void sendMessage(final NotificationMessage message) throws Exception {
+    private void sendMessage(final NotificationMessage message, final String groupId) throws Exception {
         jmsTemplate.send(queue, new MessageCreator() {
             public Message createMessage(Session session) throws JMSException {
                 try {
-                    return session.createTextMessage(notificationMessageToJson(message));
+                    TextMessage textMessage = session.createTextMessage(notificationMessageToJson(message));
+                    textMessage.setStringProperty("JMSXGroupID", groupId);
+                    return textMessage;
                 } catch (Exception e) {
                     throw Throwables.propagate(e);
                 }
